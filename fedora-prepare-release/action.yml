@@ -25,7 +25,7 @@ inputs:
 
 outputs:
   release-exists:
-    description: "A boolean indicating if the release tag already exists in the GitHub repo or not"
+    description: "true if the release tag already exists, skip if no Fedora unstable model builds from ref, otherwise false"
     value: ${{ steps.prepare.outputs.release-exists }}
   release-version:
     description: "The release tag, fedora/v<Version>-<Release>"

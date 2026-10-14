@@ -41,6 +41,6 @@ whose unstable Fedora ref equals `ref` are updated, as in `prepare-release`.
 
 | Name | Description | Example |
 |------|-------------|---------|
-| `release-exists` | `true` if the tag already exists | `false` |
+| `release-exists` | `true` if the tag already exists, `skip` if no Fedora unstable model builds from `ref` (nothing to release), else `false` | `false` |
 | `release-version` | The release tag | `fedora/v0.1.0-1` |
 | `voulage-path` | The path voulage is cloned into | `/tmp/voulage-actions-repo` |
