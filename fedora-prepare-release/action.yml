@@ -1,0 +1,56 @@
+name: Prepare Fedora Release
+description: |
+  Read `Version` and `Release` from the package spec and derive the Fedora release
+  tag `fedora/v<Version>-<Release>`. Update the corresponding Fedora `testing`
+  package models in voulage with that tag for the provided package.
+
+inputs:
+  name:
+    description: "Name of the package to create a tag and release for"
+    required: true
+  repo:
+    description: "Public git repository URL of the package"
+    required: true
+  ref:
+    description: "Git repository ref to tag and release from (e.g. fedora/main)"
+    required: true
+  voulage-repo:
+    description: "Git repository URL of the voulage to update"
+    required: false
+    default: "https://github.com/regolith-linux-fedora/voulage.git"
+  voulage-ref:
+    description: "Branch of voulage to update"
+    required: false
+    default: "fedora/main"
+
+outputs:
+  release-exists:
+    description: "A boolean indicating if the release tag already exists in the GitHub repo or not"
+    value: ${{ steps.prepare.outputs.release-exists }}
+  release-version:
+    description: "The release tag, fedora/v<Version>-<Release>"
+    value: ${{ steps.prepare.outputs.release-version }}
+  voulage-path:
+    description: "The path voulage is cloned into"
+    value: ${{ steps.voulage.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Get Voulage
+      id: voulage
+      uses: regolith-linux-fedora/actions/get-voulage@fedora/main
+      with:
+        repo: "${{ inputs.voulage-repo }}"
+        ref: "${{ inputs.voulage-ref }}"
+
+    - name: Prepare Release
+      id: prepare
+      shell: bash
+      env:
+        VOULAGE_PATH: "${{ steps.voulage.outputs.path }}"
+
+        PACKAGE_NAME: "${{ inputs.name }}"
+        PACKAGE_REPO: "${{ inputs.repo }}"
+        PACKAGE_REF: "${{ inputs.ref }}"
+      run: $GITHUB_ACTION_PATH/entrypoint.sh
