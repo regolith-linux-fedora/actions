@@ -25,6 +25,14 @@ inputs:
   component:
     description: "Regolith package archive component (e.g. main, v3.2, v3.1)"
     required: true
+  voulage-repo:
+    description: "Git repository URL of the voulage to update"
+    required: false
+    default: ""
+  voulage-ref:
+    description: "Branch of voulage to update"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -32,6 +40,9 @@ runs:
     - name: Get Voulage
       id: voulage
       uses: regolith-linux-fedora/actions/get-voulage@fedora/main
+      with:
+        repo: "${{ inputs.voulage-repo || 'https://github.com/regolith-linux/voulage.git' }}"
+        ref: "${{ inputs.voulage-ref || 'main' }}"
 
     - name: Update Manifest
       shell: bash
@@ -53,7 +64,7 @@ runs:
         GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
       with:
         repository: "${{ steps.voulage.outputs.path }}"
-        branch: "main"
+        branch: "${{ inputs.voulage-ref || 'main' }}"
         file_pattern: "*"
         commit_message: "chore: update ${{ inputs.suite }} manifest for ${{ inputs.name }}"
         commit_user_name: regolith-ci-bot
