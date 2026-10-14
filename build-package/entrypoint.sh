@@ -18,6 +18,16 @@ fi
 export DEBEMAIL="${GPG_EMAIL}"
 export DEBFULLNAME="${GPG_NAME}"
 
+EXTENSION="ext-debian.sh"
+if [ "$DISTRO" == "fedora" ]; then
+  EXTENSION="ext-rpm.sh"
+
+  # ext-rpm.sh submits to COPR only when asked to
+  if [ "$BUILD_ONLY" == "false" ]; then
+    export COPR_PUBLISH="yes"
+  fi
+fi
+
 echo -e "\033[0;34mBuilding ${PACKAGE_NAME} for ${DISTRO}/${CODENAME} (stage=${STAGE} arch=${ARCH} component=${COMPONENT})...\033[0m"
 
 # working directories
@@ -31,7 +41,7 @@ RAW_BUILD_LOG="${WORKING_DIR}/buildlog/BUILD_LOG_${TARGET_ID}.raw.txt"
 "${VOULAGE_PATH}/.github/scripts/ci-build.sh" \
   --build-only "${BUILD_ONLY}" \
   --package-name "${PACKAGE_NAME}" \
-  --extension "ext-debian.sh" \
+  --extension "${EXTENSION}" \
   --pkg-build-path "${WORKSPACE_PATH}" \
   --pkg-publish-path "${WORKING_DIR}/publish" \
   --distro "${DISTRO}" \
@@ -52,7 +62,10 @@ if [ "$BUILD_ONLY" == "false" ]; then
   echo -e "\033[0;34mGenerated ${WORKING_DIR}/buildlog/CHANGELOG_${TARGET_ID}.txt successfully.\033[0m"
 
   touch "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
-  if grep "^SRCLOG:" "${RAW_BUILD_LOG}" >/dev/null; then
+  if [ "$DISTRO" == "fedora" ]; then
+    # COPR builds from the source RPM, there are no shared sources to rebuild
+    rm "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
+  elif grep "^SRCLOG:" "${RAW_BUILD_LOG}" >/dev/null; then
     grep "^SRCLOG:" "${RAW_BUILD_LOG}" | cut -c 8- > "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
   else
     # sourcelog is empty, this means the version is brand new and
@@ -74,7 +87,9 @@ if [ "$BUILD_ONLY" == "false" ]; then
 
     echo "$DISTRO=$CODENAME=$SUITE=${debian_package_name_indicator}=${debian_package_name}=${debian_package_name}_${debian_version}=${debian_package_name}_${debian_version}.orig.tar.gz" > "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
   fi
-  echo -e "\033[0;34mGenerated ${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt successfully.\033[0m"
+  if [ -f "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt" ]; then
+    echo -e "\033[0;34mGenerated ${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt successfully.\033[0m"
+  fi
   echo "::endgroup::"
 fi
 
@@ -94,9 +109,11 @@ if [ "$BUILD_ONLY" == "false" ]; then
   cat "${WORKING_DIR}/buildlog/CHANGELOG_${TARGET_ID}.txt"
   echo "::endgroup::"
 
-  echo "::group::Printing sourcelog"
-  cat "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
-  echo "::endgroup::"
+  if [ -f "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt" ]; then
+    echo "::group::Printing sourcelog"
+    cat "${WORKING_DIR}/buildlog/SOURCELOG_${TARGET_ID}.txt"
+    echo "::endgroup::"
+  fi
 fi
 
 # shellcheck disable=SC2086
