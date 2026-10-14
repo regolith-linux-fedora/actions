@@ -13,6 +13,7 @@ fi
 
 RELEASE_EXISTS=""
 RELEASE_VERSION=""
+MODELS_MATCHED=0
 
 find_spec() {
   if [ -f "${PACKAGE_NAME}.spec" ]; then
@@ -55,6 +56,8 @@ process_model() {
     echo ""
     return
   fi
+
+  MODELS_MATCHED=$((MODELS_MATCHED + 1))
 
   if ! update_model "testing/fedora/${model_sub_path}"; then
     echo -e "\033[0;31mUpdate package at 'testing/fedora/${model_sub_path}' failed.\033[0m"
@@ -168,6 +171,12 @@ main() {
   done
 
   popd >/dev/null || exit 1
+
+  # Only branches that a Fedora unstable model builds from are released
+  if [ "$MODELS_MATCHED" -eq 0 ]; then
+    RELEASE_EXISTS=skip
+    echo "No Fedora unstable model builds ${PACKAGE_NAME} from ${PACKAGE_REF}, not releasing."
+  fi
 }
 
 main
