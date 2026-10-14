@@ -4,6 +4,10 @@ description: |
   at given ref.
 
 inputs:
+  repo:
+    description: "Git repository URL to clone voulage from"
+    required: false
+    default: "https://github.com/regolith-linux/voulage.git"
   ref:
     description: "Git repository ref to checkout"
     required: false
@@ -21,6 +25,8 @@ runs:
       id: voulage
       shell: bash
       env:
+        VOULAGE_REPO: "${{ inputs.repo }}"
+        VOULAGE_REPO_OVERRIDE: "${{ env.VOULAGE_REPO }}"
         VOULAGE_REF: "${{ inputs.ref }}"
         VOULAGE_REF_OVERRIDE: "${{ env.VOULAGE_REF }}"
       run: $GITHUB_ACTION_PATH/entrypoint.sh
