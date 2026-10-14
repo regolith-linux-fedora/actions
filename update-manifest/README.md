@@ -49,6 +49,12 @@ package name, repo, ref, and sha.
     #
     # Required.
     component: "..."
+
+    # voulage-repo and voulage-ref update another voulage and branch.
+    #
+    # Optional. Defaults to regolith-linux/voulage at main.
+    voulage-repo: ""
+    voulage-ref: ""
 ```
 
 ## Scenarios
