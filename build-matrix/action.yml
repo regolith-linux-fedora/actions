@@ -20,6 +20,22 @@ inputs:
   arch:
     description: "Regolith architectures (amd64, arm64)"
     required: true
+  distro:
+    description: "Only include this distro (e.g. fedora)"
+    required: false
+    default: ""
+  codename:
+    description: "Only include this codename (e.g. noble, 43)"
+    required: false
+    default: ""
+  voulage-repo:
+    description: "Git repository URL to read the stage tree from"
+    required: false
+    default: ""
+  voulage-ref:
+    description: "Git ref of voulage to read the stage tree from"
+    required: false
+    default: ""
 
 outputs:
   includes:
@@ -35,6 +51,9 @@ runs:
     - name: Get Voulage
       id: voulage
       uses: regolith-linux/actions/get-voulage@main
+      with:
+        repo: "${{ inputs.voulage-repo || 'https://github.com/regolith-linux/voulage.git' }}"
+        ref: "${{ inputs.voulage-ref || 'main' }}"
 
     - name: Matrix Includes Builder
       id: builder
@@ -46,4 +65,6 @@ runs:
         PACKAGE_REF: "${{ inputs.ref }}"
         BUILD_STAGE: "${{ inputs.stage }}"
         BUILD_ARCH: "${{ inputs.arch }}"
+        FILTER_DISTRO: "${{ inputs.distro }}"
+        FILTER_CODENAME: "${{ inputs.codename }}"
       run: $GITHUB_ACTION_PATH/entrypoint.sh
