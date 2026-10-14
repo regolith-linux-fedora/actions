@@ -1,0 +1,175 @@
+name: Fedora Test Pull Request
+
+# Reusable: package repos call this from templates/fedora/fedora-test-pr.yml.
+# Green = for every non-canary Fedora target and architecture: mock build,
+# rpmlint without errors, a clean install test, and the version-match check.
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the package (defaults to the repository name)"
+        type: string
+        required: false
+        default: ""
+      ref:
+        description: "Branch whose package model entry to test against (defaults to the pull request base)"
+        type: string
+        required: false
+        default: ""
+      arch:
+        description: "Architectures to test (amd64, arm64)"
+        type: string
+        required: false
+        default: "amd64 arm64"
+      voulage-ref:
+        description: "Branch of regolith-linux-fedora/voulage to read the package models from"
+        type: string
+        required: false
+        default: "fedora/main"
+
+# Need to explicitly set shell according to: https://github.com/actions/runner/issues/353#issuecomment-1067227665
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  matrix-builder:
+    runs-on: ubuntu-24.04
+    outputs:
+      includes: ${{ steps.builder.outputs.includes }}
+      runners: ${{ steps.builder.outputs.runners }}
+    steps:
+      - name: Build Matrix
+        id: builder
+        uses: regolith-linux-fedora/actions/build-matrix@fedora/main
+        with:
+          name: "${{ inputs.name || github.event.repository.name }}"
+          ref: "${{ inputs.ref || github.base_ref || github.ref_name }}"
+          arch: "${{ inputs.arch }}"
+          stage: "unstable"
+          distro: "fedora"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
+
+      - name: Check Matrix
+        run: |
+          if [ "$(echo '${{ steps.builder.outputs.includes }}' | jq length)" == "0" ]; then
+            echo "::error::No Fedora target builds ${{ inputs.name || github.event.repository.name }} from ${{ inputs.ref || github.base_ref || github.ref_name }}. Check the package model in regolith-linux-fedora/voulage."
+            exit 1
+          fi
+
+  build:
+    name: build (${{ matrix.codename }}, ${{ matrix.arch }})
+    runs-on: ${{ fromJSON(needs.matrix-builder.outputs.runners)[matrix.arch] }}
+    needs: matrix-builder
+    container:
+      image: "${{ matrix.container }}"
+      options: --privileged
+    continue-on-error: ${{ matrix.canary == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix-builder.outputs.includes) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Version
+        uses: regolith-linux-fedora/actions/fedora-version-check@fedora/main
+        with:
+          name: "${{ inputs.name || github.event.repository.name }}"
+
+      - name: Build Package
+        id: build
+        uses: regolith-linux-fedora/actions/build-package@fedora/main
+        with:
+          only-build: "true"
+          name: "${{ inputs.name || github.event.repository.name }}"
+          distro: "${{ matrix.distro }}"
+          codename: "${{ matrix.codename }}"
+          stage: "unstable"
+          suite: "unstable"
+          component: "main"
+          arch: "${{ matrix.arch }}"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
+
+      - name: rpmlint
+        run: |
+          rpms="${{ steps.build.outputs.publish-path }}${{ matrix.distro }}/${{ matrix.codename }}/unstable"
+
+          # A <name>.rpmlintrc next to the spec filters known false positives
+          config=()
+          for rc in *.rpmlintrc; do
+            if [ -f "$rc" ]; then
+              config+=(--rpmlintrc "$rc")
+            fi
+          done
+
+          rpmlint "${config[@]}" ./*.spec "$rpms"/*.rpm
+
+      - name: Upload Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: RPMS_${{ matrix.codename }}-${{ matrix.arch }}
+          path: "${{ steps.build.outputs.publish-path }}${{ matrix.distro }}/${{ matrix.codename }}/unstable/*.rpm"
+
+      - name: Warn on Canary Failure
+        if: failure() && matrix.canary == true
+        run: |
+          echo "::warning title=Canary target failed::fedora ${{ matrix.codename }} ${{ matrix.arch }} failed; canary targets don't fail the pull request."
+
+  install:
+    name: install (${{ matrix.codename }}, ${{ matrix.arch }})
+    runs-on: ${{ fromJSON(needs.matrix-builder.outputs.runners)[matrix.arch] }}
+    needs: [matrix-builder, build]
+    container: "registry.fedoraproject.org/fedora:${{ matrix.codename }}"
+    continue-on-error: ${{ matrix.canary == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix-builder.outputs.includes) }}
+    steps:
+      - name: Download Packages
+        uses: actions/download-artifact@v4
+        with:
+          name: RPMS_${{ matrix.codename }}-${{ matrix.arch }}
+          path: rpms
+
+      - name: Enable regolith-unstable
+        run: |
+          # Dependencies on other Regolith packages come from the unstable COPR project
+          chroot="fedora-${{ matrix.codename }}-$(uname -m)"
+          baseurl="https://download.copr.fedorainfracloud.org/results/@regolith/regolith-unstable/${chroot}/"
+          if curl -fsSL -o /dev/null "${baseurl}repodata/repomd.xml"; then
+            {
+              echo "[regolith-unstable]"
+              echo "name=Regolith unstable (COPR @regolith/regolith-unstable)"
+              echo "baseurl=${baseurl}"
+              echo "gpgcheck=1"
+              echo "gpgkey=https://download.copr.fedorainfracloud.org/results/@regolith/regolith-unstable/pubkey.gpg"
+              echo "enabled=1"
+            } > /etc/yum.repos.d/regolith-unstable.repo
+            cat /etc/yum.repos.d/regolith-unstable.repo
+          else
+            echo "regolith-unstable has no ${chroot} repo yet, installing with Fedora repos only."
+          fi
+
+      - name: Install Packages
+        run: |
+          mapfile -t rpms < <(find rpms -name '*.rpm' ! -name '*.src.rpm' ! -name '*-debuginfo-*' ! -name '*-debugsource-*' | sort)
+          if [ "${#rpms[@]}" -eq 0 ]; then
+            echo "::error::No binary RPMs to install"
+            exit 1
+          fi
+          printf '%s\n' "${rpms[@]}"
+          dnf -y install "${rpms[@]}"
+          for rpm in "${rpms[@]}"; do
+            rpm -V "$(rpm -qp --qf '%{name}' "$rpm")"
+          done
+
+      - name: Warn on Canary Failure
+        if: failure() && matrix.canary == true
+        run: |
+          echo "::warning title=Canary target failed::fedora ${{ matrix.codename }} ${{ matrix.arch }} install failed; canary targets don't fail the pull request."

@@ -1,0 +1,84 @@
+name: Fedora Prepare a Release
+
+# Reusable: package repos call this from templates/fedora/fedora-prepare-release.yml
+# when the spec changes on a fedora/** branch. Mirrors prepare-release: creates
+# tag fedora/v<Version>-<Release> and a GitHub release, and points the package's
+# Fedora testing models in regolith-linux-fedora/voulage at the tag.
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the package (defaults to the repository name)"
+        type: string
+        required: false
+        default: ""
+      ref:
+        description: "Branch to release from (defaults to the pushed branch)"
+        type: string
+        required: false
+        default: ""
+      voulage-ref:
+        description: "Branch of regolith-linux-fedora/voulage to update"
+        type: string
+        required: false
+        default: "fedora/main"
+    secrets:
+      PORT_BOT_TOKEN:
+        description: "Token that can push to regolith-linux-fedora/voulage and create releases in the package repo"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Need to explicitly set shell according to: https://github.com/actions/runner/issues/353#issuecomment-1067227665
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    container: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare Release
+        id: prepare
+        uses: regolith-linux-fedora/actions/fedora-prepare-release@fedora/main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORT_BOT_TOKEN }}
+        with:
+          name: "${{ inputs.name || github.event.repository.name }}"
+          repo: "${{ github.server_url }}/${{ github.repository }}.git"
+          ref: "${{ inputs.ref || github.ref_name }}"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
+
+      - name: Push Changes to Voulage
+        uses: stefanzweifel/git-auto-commit-action@v5
+        if: ${{ steps.prepare.outputs.release-exists == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORT_BOT_TOKEN }}
+        with:
+          repository: "${{ steps.prepare.outputs.voulage-path }}"
+          branch: "${{ inputs.voulage-ref }}"
+          file_pattern: "stage/testing/fedora/**"
+          commit_message: "chore: bump ${{ inputs.name || github.event.repository.name }} fedora testing to ${{ steps.prepare.outputs.release-version }}"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+      - name: Release Package
+        uses: softprops/action-gh-release@v2
+        if: ${{ steps.prepare.outputs.release-exists == 'false' }}
+        with:
+          name: ${{ steps.prepare.outputs.release-version }}
+          tag_name: ${{ steps.prepare.outputs.release-version }}
+          token: ${{ secrets.PORT_BOT_TOKEN }}
+          target_commitish: "${{ github.sha }}"
+          generate_release_notes: true
