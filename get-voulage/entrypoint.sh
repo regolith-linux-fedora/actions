@@ -3,7 +3,14 @@
 set -e
 
 VOULAGE_PATH="/tmp/voulage-actions-repo"
-VOULAGE_REPO="https://github.com/regolith-linux/voulage.git"
+
+if [ -n "$VOULAGE_REPO_OVERRIDE" ]; then
+  VOULAGE_REPO="$VOULAGE_REPO_OVERRIDE"
+fi
+
+if [ -z "$VOULAGE_REPO" ]; then
+  VOULAGE_REPO="https://github.com/regolith-linux/voulage.git"
+fi
 
 if [ -n "$GITHUB_TOKEN" ]; then
   git config --global "url.https://git:${GITHUB_TOKEN}@github.com/.insteadOf" https://github.com/

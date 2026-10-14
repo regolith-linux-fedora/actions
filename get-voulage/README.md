@@ -10,7 +10,14 @@ at given ref.
 ```yaml
 - uses: regolith-linux/actions/get-voulage@main
   with:
-    # ref is the valid ref in git repository to checkout.
+    # repo is the git repository URL to clone voulage from. The VOULAGE_REPO
+    # environment variable overrides it.
+    #
+    # Optional. Defaults to https://github.com/regolith-linux/voulage.git
+    repo: "https://github.com/regolith-linux/voulage.git"
+
+    # ref is the valid ref in git repository to checkout. The VOULAGE_REF
+    # environment variable overrides it.
     #
     # Reguired.
     ref: "main"
