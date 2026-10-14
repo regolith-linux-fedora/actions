@@ -12,7 +12,7 @@ inputs:
     description: "Name of the package to build"
     required: true
   distro:
-    description: "Target Distro to build the package for (debian, ubuntu)"
+    description: "Target Distro to build the package for (debian, ubuntu, fedora)"
     required: true
   codename:
     description: "Target Codename to build the package for (e.g. focal, bullseye)"
@@ -37,6 +37,14 @@ inputs:
     description: "Full Name associated with the GPG Key"
     required: true
     default: "Regolith Linux"
+  voulage-repo:
+    description: "Git repository URL to get the voulage build scripts from"
+    required: false
+    default: ""
+  voulage-ref:
+    description: "Git ref of voulage to get the build scripts from"
+    required: false
+    default: ""
 
 outputs:
   publish-path:
@@ -52,6 +60,9 @@ runs:
     - name: Get Voulage
       id: voulage
       uses: regolith-linux/actions/get-voulage@main
+      with:
+        repo: "${{ inputs.voulage-repo || 'https://github.com/regolith-linux/voulage.git' }}"
+        ref: "${{ inputs.voulage-ref || 'main' }}"
 
     - name: Build Package
       id: build

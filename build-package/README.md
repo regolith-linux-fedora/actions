@@ -20,7 +20,8 @@ name, package repo, and package ref to checkout the code.
     # Required.
     name: "..."
 
-    # distro is the target distro to build the package for (debian, ubuntu).
+    # distro is the target distro to build the package for (debian, ubuntu, fedora).
+    # fedora builds with voulage's ext-rpm.sh and, unless only-build, publishes to COPR.
     #
     # Required.
     distro: "..."
@@ -59,6 +60,12 @@ name, package repo, and package ref to checkout the code.
     #
     # Required.
     gpg-name: "Regolith Linux"
+
+    # voulage-repo and voulage-ref get the build scripts from another voulage.
+    #
+    # Optional. Defaults to regolith-linux/voulage at main.
+    voulage-repo: ""
+    voulage-ref: ""
 ```
 
 ## Outputs
