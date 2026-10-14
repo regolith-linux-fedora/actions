@@ -13,6 +13,11 @@ for dir in "$REPO_ROOT"/*; do
         continue
     fi
 
+    # only action folders (skip e.g. docs/, templates/, tools/)
+    if [ ! -f "$dir/action.yml" ] && [ ! -f "$dir/_action.yml" ]; then
+        continue
+    fi
+
     action_name="$(basename "$dir")"
     action_title="n/a"
     action_description="n/a"

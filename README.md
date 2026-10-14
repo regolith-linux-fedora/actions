@@ -10,6 +10,8 @@ A collection of reusable Github Actions workflows.
 | `build-matrix` | Build a matrix of currently supported distros and codenames in encoded JSON list format. The list is being built out of `stage/unstable` folder of [voulage](https://github.com/regolith-linux/voulage/).  |
 | `build-package` | Build a package for speficied distro/codename/stage triplet. It uses package name, package repo, and package ref to checkout the code.  |
 | `ensure-sudo` | Ensure `sudo` command is installed and available.  |
+| `fedora-prepare-release` | Read `Version` and `Release` from the package spec and derive the Fedora release tag `fedora/v<Version>-<Release>`. Update the corresponding Fedora `testing` package models in voulage with that tag for the provided package.  |
+| `fedora-version-check` | Check that the spec `Version` matches the upstream version in `debian/changelog`, so the Fedora and Debian packages of a repo ship the same release.  |
 | `get-voulage` | Clone and fetch [voulage](https://github.com/regolith-linux/voulage/) repository at given ref.  |
 | `import-gpg` | Import given GPG private key with its associated email and full name.  |
 | `prepare-release` | Extract the version out of `debian/changelog` file and pass it through the tag generator to determine the actual release version. Update corresponding `testing` package models with that release version for the provided package.  |
