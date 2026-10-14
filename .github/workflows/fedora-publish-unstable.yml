@@ -1,0 +1,139 @@
+name: Fedora Publish to Unstable
+
+# Reusable: package repos call this from templates/fedora/fedora-publish-unstable.yml
+# on push to fedora/** branches. Builds the source RPM for every Fedora target,
+# submits it to COPR @regolith/regolith-unstable, waits for the result, then
+# records the built commit in the voulage manifests so voulage doesn't rebuild it.
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the package (defaults to the repository name)"
+        type: string
+        required: false
+        default: ""
+      ref:
+        description: "Branch to publish (defaults to the pushed branch)"
+        type: string
+        required: false
+        default: ""
+      voulage-ref:
+        description: "Branch of regolith-linux-fedora/voulage to read and update"
+        type: string
+        required: false
+        default: "fedora/main"
+    secrets:
+      COPR_CONFIG:
+        description: "copr-cli config (~/.config/copr) with a token for the @regolith group"
+        required: true
+      PORT_BOT_TOKEN:
+        description: "Token that can push to regolith-linux-fedora/voulage"
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Need to explicitly set shell according to: https://github.com/actions/runner/issues/353#issuecomment-1067227665
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  matrix-builder:
+    runs-on: ubuntu-24.04
+    outputs:
+      includes: ${{ steps.builder.outputs.includes }}
+      runners: ${{ steps.builder.outputs.runners }}
+    steps:
+      - name: Build Matrix
+        id: builder
+        uses: regolith-linux-fedora/actions/build-matrix@fedora/main
+        with:
+          name: "${{ inputs.name || github.event.repository.name }}"
+          ref: "${{ inputs.ref || github.ref_name }}"
+          arch: "amd64 arm64"
+          stage: "unstable"
+          distro: "fedora"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
+
+  build:
+    name: publish (${{ matrix.codename }}, ${{ matrix.arch }})
+    runs-on: ${{ fromJSON(needs.matrix-builder.outputs.runners)[matrix.arch] }}
+    needs: matrix-builder
+    if: ${{ needs.matrix-builder.outputs.includes != '[]' }}
+    container:
+      image: "${{ matrix.container }}"
+      options: --privileged
+    continue-on-error: ${{ matrix.canary == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix-builder.outputs.includes) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure COPR
+        env:
+          COPR_CONFIG: "${{ secrets.COPR_CONFIG }}"
+        run: |
+          mkdir -p ~/.config
+          echo "$COPR_CONFIG" > ~/.config/copr
+          chmod 600 ~/.config/copr
+
+      - name: Build and Publish Package
+        uses: regolith-linux-fedora/actions/build-package@fedora/main
+        with:
+          only-build: "false"
+          name: "${{ inputs.name || github.event.repository.name }}"
+          distro: "${{ matrix.distro }}"
+          codename: "${{ matrix.codename }}"
+          stage: "unstable"
+          suite: "unstable"
+          component: "main"
+          arch: "${{ matrix.arch }}"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
+
+      - name: Warn on Canary Failure
+        if: failure() && matrix.canary == true
+        run: |
+          echo "::warning title=Canary target failed::fedora ${{ matrix.codename }} ${{ matrix.arch }} failed to publish; canary targets don't fail the run."
+
+  manifests:
+    runs-on: ubuntu-24.04
+    needs: [matrix-builder, build]
+    if: ${{ !failure() && !cancelled() && needs.matrix-builder.outputs.includes != '[]' }}
+    container: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+    env:
+      HAS_BOT_TOKEN: ${{ secrets.PORT_BOT_TOKEN != '' }}
+    steps:
+      - name: Non-canary Targets
+        id: targets
+        run: |
+          # Canary targets may have failed, leave their manifests to voulage
+          echo "matrix=$(echo '${{ needs.matrix-builder.outputs.includes }}' | jq -c '[.[] | select(.canary != true)]')" >> $GITHUB_OUTPUT
+
+      - name: No Bot Token
+        if: env.HAS_BOT_TOKEN != 'true'
+        run: |
+          echo "::warning::PORT_BOT_TOKEN is not set, voulage manifests are not updated and voulage will rebuild this commit."
+
+      - name: Update Manifests
+        if: env.HAS_BOT_TOKEN == 'true'
+        uses: regolith-linux-fedora/actions/update-manifest@fedora/main
+        env:
+          GITHUB_TOKEN: ${{ secrets.PORT_BOT_TOKEN }}
+        with:
+          name: "${{ inputs.name || github.event.repository.name }}"
+          repo: "${{ github.server_url }}/${{ github.repository }}.git"
+          ref: "${{ inputs.ref || github.ref_name }}"
+          sha: "${{ github.sha }}"
+          matrix: "${{ steps.targets.outputs.matrix }}"
+          suite: "unstable"
+          component: "main"
+          voulage-repo: "https://github.com/regolith-linux-fedora/voulage.git"
+          voulage-ref: "${{ inputs.voulage-ref }}"
