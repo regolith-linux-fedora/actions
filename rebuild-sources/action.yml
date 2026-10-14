@@ -46,7 +46,7 @@ runs:
   steps:
     - name: Get Voulage
       id: voulage
-      uses: regolith-linux/actions/get-voulage@main
+      uses: regolith-linux-fedora/actions/get-voulage@fedora/main
 
     - name: Prepare Source Files
       shell: bash
@@ -93,7 +93,7 @@ runs:
       run: $GITHUB_ACTION_PATH/entrypoint.sh
 
     - name: Upload Source Files
-      uses: regolith-linux/actions/upload-files@main
+      uses: regolith-linux-fedora/actions/upload-files@fedora/main
       env:
         server-address: "${{ env.server-address }}"
         server-username: "${{ env.server-username }}"

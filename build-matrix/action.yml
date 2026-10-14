@@ -50,7 +50,7 @@ runs:
   steps:
     - name: Get Voulage
       id: voulage
-      uses: regolith-linux/actions/get-voulage@main
+      uses: regolith-linux-fedora/actions/get-voulage@fedora/main
       with:
         repo: "${{ inputs.voulage-repo || 'https://github.com/regolith-linux/voulage.git' }}"
         ref: "${{ inputs.voulage-ref || 'main' }}"
