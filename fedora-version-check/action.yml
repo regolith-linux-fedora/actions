@@ -1,0 +1,32 @@
+name: Check Fedora Spec Version
+description: |
+  Check that the spec `Version` matches the upstream version in `debian/changelog`,
+  so the Fedora and Debian packages of a repo ship the same release.
+
+inputs:
+  path:
+    description: "Path to the package repository"
+    required: false
+    default: "."
+  name:
+    description: "Name of the package (the spec is <name>.spec)"
+    required: true
+
+outputs:
+  spec-version:
+    description: "Version from the spec"
+    value: ${{ steps.check.outputs.spec-version }}
+  debian-version:
+    description: "Upstream version from debian/changelog (no epoch, no Debian revision)"
+    value: ${{ steps.check.outputs.debian-version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check Version
+      id: check
+      shell: bash
+      env:
+        PACKAGE_PATH: "${{ inputs.path }}"
+        PACKAGE_NAME: "${{ inputs.name }}"
+      run: $GITHUB_ACTION_PATH/entrypoint.sh
