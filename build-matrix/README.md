@@ -34,7 +34,26 @@ format. The list is being built out of `stage/unstable` folder of [voulage](http
     #
     # Required.
     arch: "..."
+
+    # distro and codename only include matching targets (e.g. fedora, 43).
+    #
+    # Optional.
+    distro: ""
+    codename: ""
+
+    # voulage-repo and voulage-ref read the stage tree from another voulage.
+    #
+    # Optional. Defaults to regolith-linux/voulage at main.
+    voulage-repo: ""
+    voulage-ref: ""
 ```
+
+A distro level model (e.g. `stage/unstable/fedora/package-model.json`) is
+applied between the stage and codename models, as voulage merges them.
+
+Fedora items also carry `container`, the `ci-fedora` image to build in
+(`FEDORA_CI_IMAGE` overrides the image name), and `canary`, which is `true`
+for Rawhide. Canary jobs should use `continue-on-error`.
 
 ## Outputs
 

@@ -36,9 +36,12 @@ if [ ! -d "$VOULAGE_PATH/stage/$BUILD_STAGE" ]; then
   exit 1
 fi
 
+FEDORA_CI_IMAGE="${FEDORA_CI_IMAGE:-ghcr.io/regolith-linux-fedora/ci-fedora}"
+
 includes=()
 error_msg=""
 STAGE_MODEL_PACKAGE_REF="n/a"
+DISTRO_MODEL_PACKAGE_REF="n/a"
 
 process_model() {
   process_level="$1"
@@ -81,6 +84,9 @@ process_model() {
       if [ "$process_level" == "stage" ]; then
         STAGE_MODEL_PACKAGE_REF="$ref"
       fi
+      if [ "$process_level" == "distro-root" ]; then
+        DISTRO_MODEL_PACKAGE_REF="$ref"
+      fi
 
       # Package ref is different that the ref we are executing this on.
       # Note: this is only needed on distro level.
@@ -96,11 +102,11 @@ process_model() {
       # Don't 'return 1' here!
       echo "  - package not found in stage model (it might exist in distro level)"
       echo ""
-    else
-      # Distro doesn't explicitly override the root model. We just need
-      # to make sure the root model's ref is the same as requested ref.
-      if [ "$STAGE_MODEL_PACKAGE_REF" != "$PACKAGE_REF" ]; then
-        error_msg="Ignored (request ref: $PACKAGE_REF, model ref: $STAGE_MODEL_PACKAGE_REF)"
+    elif [ "$process_level" == "distro" ]; then
+      # Codename doesn't explicitly override the stage or distro model. We
+      # just need to make sure the inherited ref is the same as requested ref.
+      if [ "$DISTRO_MODEL_PACKAGE_REF" != "$PACKAGE_REF" ]; then
+        error_msg="Ignored (request ref: $PACKAGE_REF, model ref: $DISTRO_MODEL_PACKAGE_REF)"
         return 1
       fi
     fi
@@ -125,6 +131,23 @@ main() {
     distro=$(echo "$dir" | cut -d/ -f3)
     codename=$(echo "$dir" | cut -d/ -f4)
 
+    if [ -n "$FILTER_DISTRO" ] && [ "$FILTER_DISTRO" != "$distro" ]; then
+      continue
+    fi
+    if [ -n "$FILTER_CODENAME" ] && [ "$FILTER_CODENAME" != "$codename" ]; then
+      continue
+    fi
+
+    # An optional distro level model (e.g. stage/unstable/fedora/package-model.json)
+    # sits between the stage and the codename models, as in voulage's merge.
+    DISTRO_MODEL_PACKAGE_REF="$STAGE_MODEL_PACKAGE_REF"
+    if [ "$MATRIX_TYPE" == "package" ] && [ -f "stage/$BUILD_STAGE/$distro/package-model.json" ]; then
+      if ! process_model "distro-root" "stage/$BUILD_STAGE/$distro/package-model.json"; then
+        echo "  - $distro/$codename: $error_msg"
+        continue
+      fi
+    fi
+
     # Skip for this distro/codename pair.
     #
     # Possible reasons:
@@ -140,7 +163,18 @@ main() {
     echo "  - $distro/$codename: OK"
 
     for arch in $BUILD_ARCH; do
-      includes+=("$(jq -n -c --arg distro "$distro" --arg codename "$codename" --arg arch "$arch" '$ARGS.named')")
+      if [ "$distro" == "fedora" ]; then
+        # Fedora builds run in the Port Org's images; Rawhide is a canary
+        # target whose failures must not fail the run.
+        canary="false"
+        if [ "$codename" == "rawhide" ]; then
+          canary="true"
+        fi
+        includes+=("$(jq -n -c --arg distro "$distro" --arg codename "$codename" --arg arch "$arch" \
+          --arg container "${FEDORA_CI_IMAGE}:${codename}-${arch}" --argjson canary "$canary" '$ARGS.named')")
+      else
+        includes+=("$(jq -n -c --arg distro "$distro" --arg codename "$codename" --arg arch "$arch" '$ARGS.named')")
+      fi
     done
   done
 
