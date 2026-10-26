@@ -24,6 +24,9 @@ on:
         required: false
         default: "fedora/main"
     secrets:
+      GHCR_READ_TOKEN:
+        description: "Classic token with read:packages for the private ci-fedora images (optional; defaults to GITHUB_TOKEN)"
+        required: false
       COPR_CONFIG:
         description: "copr-cli config (~/.config/copr) with a token for the @regolith group"
         required: true
@@ -67,6 +70,9 @@ jobs:
     container:
       image: "${{ matrix.container }}"
       options: --privileged
+      credentials:
+        username: ${{ vars.GHCR_READ_USER || github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
     continue-on-error: ${{ matrix.canary == true }}
     strategy:
       fail-fast: false
@@ -107,7 +113,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [matrix-builder, build]
     if: ${{ !failure() && !cancelled() && needs.matrix-builder.outputs.includes != '[]' }}
-    container: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+    container:
+      image: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+      credentials:
+        username: ${{ vars.GHCR_READ_USER || github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
     env:
       HAS_BOT_TOKEN: ${{ secrets.PORT_BOT_TOKEN != '' }}
     steps:

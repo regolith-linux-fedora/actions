@@ -27,6 +27,10 @@ on:
         type: string
         required: false
         default: "fedora/main"
+    secrets:
+      GHCR_READ_TOKEN:
+        description: "Classic token with read:packages for the private ci-fedora images (optional; defaults to GITHUB_TOKEN)"
+        required: false
 
 # Need to explicitly set shell according to: https://github.com/actions/runner/issues/353#issuecomment-1067227665
 defaults:
@@ -66,6 +70,9 @@ jobs:
     container:
       image: "${{ matrix.container }}"
       options: --privileged
+      credentials:
+        username: ${{ vars.GHCR_READ_USER || github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
     continue-on-error: ${{ matrix.canary == true }}
     strategy:
       fail-fast: false
