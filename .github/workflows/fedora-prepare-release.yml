@@ -24,6 +24,9 @@ on:
         required: false
         default: "fedora/main"
     secrets:
+      GHCR_READ_TOKEN:
+        description: "Classic token with read:packages for the private ci-fedora images (optional; defaults to GITHUB_TOKEN)"
+        required: false
       PORT_BOT_TOKEN:
         description: "Token that can push to regolith-linux-fedora/voulage and create releases in the package repo"
         required: true
@@ -40,7 +43,11 @@ defaults:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    container: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+    container:
+      image: "ghcr.io/regolith-linux-fedora/ci-fedora:44-amd64"
+      credentials:
+        username: ${{ vars.GHCR_READ_USER || github.actor }}
+        password: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -13,3 +13,4 @@ concurrency:
 jobs:
   test:
     uses: regolith-linux-fedora/actions/.github/workflows/fedora-test-pr.yml@fedora/main
+    secrets: inherit

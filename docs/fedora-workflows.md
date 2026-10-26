@@ -33,7 +33,8 @@ The targets come from the package's entries in voulage: a release whose model
 sets the package to `null`, or to another ref, is left out of the matrix. Each
 target builds on its native runner (`amd64`: `ubuntu-24.04`, `arm64`:
 `ubuntu-24.04-arm`) in `ghcr.io/regolith-linux-fedora/ci-fedora:<release>-<arch>`.
-mock needs the container to be privileged.
+mock needs the container to be privileged. The `ci-fedora` images are **private**, so every job that uses them
+logs in to ghcr.io (see Secrets).
 
 **Rawhide is a canary.** Its jobs use `continue-on-error`: a failure shows as
 a warning annotation and never fails the run.
@@ -59,6 +60,9 @@ Org secrets, available to all repositories (Fedora Task 00-03):
 |---|---|
 | `COPR_CONFIG` | publish workflows: the `~/.config/copr` block of a `@regolith` member |
 | `PORT_BOT_TOKEN` | prepare-release (tags, releases, voulage commits) and the manifest update after publishing |
+| `GHCR_READ_TOKEN` | every job that runs in `ci-fedora`: a **classic** token with `read:packages` (GHCR doesn't accept fine-grained tokens). Org variable `GHCR_READ_USER` holds its owner's login. Without it, jobs fall back to the repo's `GITHUB_TOKEN`, which can pull only if the `ci-fedora` package grants that repository access (package settings → Manage Actions access). |
+
+All stubs pass secrets with `secrets: inherit`, so org secrets reach the reusable workflows.
 
 Without `PORT_BOT_TOKEN` a publish still succeeds, with a warning that voulage's
 manifest was not updated, so voulage builds the commit again later. COPR
@@ -66,6 +70,8 @@ doesn't rebuild a version-release it already has.
 
 ## Reading failures
 
+- **Initialize containers: `denied` / `unauthorized` pulling ci-fedora**: the job couldn't log in to ghcr.io. Set
+  `GHCR_READ_TOKEN` and `GHCR_READ_USER` at org level, or grant the repository read access to the `ci-fedora` package.
 - **No Fedora target builds `<package>` from `<branch>`**: the matrix is
   empty. The branch isn't the `ref` of the package in voulage's Fedora
   unstable model.
