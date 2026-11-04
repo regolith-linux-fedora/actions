@@ -39,6 +39,20 @@ logs in to ghcr.io (see Secrets).
 **Rawhide is a canary.** Its jobs use `continue-on-error`: a failure shows as
 a warning annotation and never fails the run.
 
+**Optional Session Test.** `fedora-session-test.yml` has no stub: a repo whose
+Task needs the Session Test calls it from its own workflow with the packages to
+install (from `regolith-unstable` by default). It runs the headless sway harness
+from `regolith-linux-fedora/fedora-tests` on every Target in voulage
+`docs/fedora/targets.json`, both architectures, Rawhide non-blocking:
+
+```yaml
+jobs:
+  session-test:
+    uses: regolith-linux-fedora/actions/.github/workflows/fedora-session-test.yml@fedora/main
+    with:
+      packages: "regolith-session-sway regolith-wm-config"
+```
+
 ### Checks
 
 - **Version check** (`fedora-version-check`): the spec `Version` must equal the

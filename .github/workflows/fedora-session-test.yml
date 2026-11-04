@@ -1,0 +1,49 @@
+# Optional Session Test for a package repo: installs the given packages from
+# regolith-unstable into a headless sway session and runs the Session Test
+# harness (regolith-linux-fedora/fedora-tests, Fedora Task 01-08) on every
+# Fedora Target. Opt in from a workflow in the package repo, e.g.
+#
+#   jobs:
+#     session-test:
+#       uses: regolith-linux-fedora/actions/.github/workflows/fedora-session-test.yml@fedora/main
+#       with:
+#         packages: "regolith-session-sway regolith-wm-config"
+name: Fedora Session Test
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        description: "Packages to install for the test (space-separated)"
+        type: string
+        required: true
+      profile:
+        description: "Test profile in fedora-tests: stock | regolith"
+        type: string
+        required: false
+        default: "regolith"
+      extra_repo:
+        description: "Repo the packages come from"
+        type: string
+        required: false
+        default: "copr:@regolith/regolith-unstable"
+      releases:
+        description: "Space-separated Fedora releases (default: the Targets in voulage docs/fedora/targets.json)"
+        type: string
+        required: false
+        default: ""
+      harness_ref:
+        description: "Ref of regolith-linux-fedora/fedora-tests"
+        type: string
+        required: false
+        default: "main"
+
+jobs:
+  session-test:
+    uses: regolith-linux-fedora/fedora-tests/.github/workflows/session-test.yml@main
+    with:
+      packages: ${{ inputs.packages }}
+      profile: ${{ inputs.profile }}
+      extra_repo: ${{ inputs.extra_repo }}
+      releases: ${{ inputs.releases }}
+      harness_ref: ${{ inputs.harness_ref }}
