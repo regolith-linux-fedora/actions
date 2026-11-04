@@ -1,0 +1,30 @@
+name: Test Fedora Tools
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/check-version-match.sh"
+      - "tools/test-check-version-match.sh"
+      - ".github/workflows/test-fedora-tools.yml"
+  push:
+    branches:
+      - "fedora/**"
+    paths:
+      - "tools/check-version-match.sh"
+      - "tools/test-check-version-match.sh"
+      - ".github/workflows/test-fedora-tools.yml"
+
+jobs:
+  version-match:
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    steps:
+      - name: Install tools
+        run: dnf -y install rpm-build python3 python3-rpm
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test check-version-match.sh
+        run: tools/test-check-version-match.sh
