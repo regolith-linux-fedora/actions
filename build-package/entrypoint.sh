@@ -31,8 +31,16 @@ fi
 echo -e "\033[0;34mBuilding ${PACKAGE_NAME} for ${DISTRO}/${CODENAME} (stage=${STAGE} arch=${ARCH} component=${COMPONENT})...\033[0m"
 
 # working directories
-WORKSPACE_PATH=$(realpath "$(realpath "$WORKSPACE_PATH")/../")
+CHECKOUT_PATH=$(realpath "$WORKSPACE_PATH")
+WORKSPACE_PATH=$(realpath "$CHECKOUT_PATH/../")
 WORKING_DIR=$(realpath "/build/")
+
+# ci-build.sh looks for the package in $WORKSPACE_PATH/$PACKAGE_NAME. When the
+# repository is named differently from the package (i3status-rs_debian builds
+# i3status-rs), point that path at the checkout.
+if [ ! -e "$WORKSPACE_PATH/$PACKAGE_NAME" ]; then
+  ln -s "$CHECKOUT_PATH" "$WORKSPACE_PATH/$PACKAGE_NAME"
+fi
 
 # raw build log file
 TARGET_ID="${DISTRO}-${CODENAME}-${STAGE}-${ARCH}"

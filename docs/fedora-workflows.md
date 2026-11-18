@@ -16,6 +16,17 @@ tools/install-fedora-workflows.sh ../<package-repo>
 This copies `templates/fedora/*.yml` into `.github/workflows/`. Run it again to
 pick up template changes; it only rewrites stubs that differ.
 
+The stubs use the repository name as the package name. When the repository is
+named differently from the package and its voulage entry (for example
+`i3status-rs_debian`, which builds `i3status-rs`), pass the package name:
+
+```shell
+tools/install-fedora-workflows.sh --name i3status-rs ../i3status-rs_debian
+```
+
+It is passed to the reusable workflows as `with: name:`, and `build-package`
+finds the checkout under that name.
+
 The package needs `<package>.spec` at the top of the repo, and an entry in
 `regolith-linux-fedora/voulage` `stage/unstable/fedora/` whose `ref` is the
 branch the stubs run on (usually `fedora/<upstream-branch>`).
